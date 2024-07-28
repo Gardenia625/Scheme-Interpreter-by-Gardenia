@@ -4,6 +4,10 @@ from primitives import *
 from colorama import init as colorama_init
 colorama_init()
 
+# 语法树中的 Pair 都是 List
+# 因此可用 pair.a 和 pair.b 来表示第一个和其余所有的
+# 有时候用 pair[0] 而不是 pair.a 来达到视觉上的强调效果
+
 class Frame:
     def __init__(self, parent):
         self.parent = parent
@@ -23,13 +27,14 @@ class Frame:
         """建立一个 self 的子环境"""
         frame = Frame(self)
         while isinstance(keys, Pair):
-            frame.define(keys.a, vals.a)
+            frame.define(keys[0], vals[0])
             keys, vals = keys.b, vals.b
         return frame
     def __str__(self):
         return str(self.bindings)
 
 class Lambda:
+    """Lambda 表达式"""
     def __init__(self, formals, body, env):
         self.formals = formals
         self.body = body
@@ -83,32 +88,36 @@ def s_apply(func, args, env):
 # 特殊形式
 # =============================================================================
 
-def s_begin(vals, env): # 逐个运行 begin 后的表达式
+def s_begin(vals, env):
+    """逐个运行 begin 后的表达式"""
     while vals:
-        result = s_eval(vals.a, env)
+        result = s_eval(vals[0], env)
         vals = vals.b
     return result
 
-def s_lambda(vals, env): # 定义 lambda 表达式
+def s_lambda(vals, env):
+    """定义 lambda 表达式"""
     formals, body = vals.a, vals.b
     return Lambda(formals, body, env)
 
-def s_define(vals, env): # 定义变量, 不返回值
-    if isinstance(vals[0], Pair): # 处理特殊语法 (define (f x) (* x 2))
+def s_define(vals, env):
+    """定义变量 (不返回值)"""
+    if isinstance(vals[0], Pair): # 处理语法 (define (f x) (* x 2))
         formals, body = vals[0].b, vals.b
         lam = s_lambda(Pair(formals, body), env)
         env.define(vals[0][0], lam)
-    else: # (define x 2)
+    else: # 处理语法 (define x 2)
         env.define(vals[0], s_eval(vals[1], env))
     return NoNo
     
-def s_quote(vals, env): # quote 阻止其后的表达式被计算
+def s_quote(vals, env):
+    """quote 阻止其后的表达式被计算"""
     return vals
 
 def s_and(vals, env):
     result = True
     while isinstance(vals, Pair):
-        result = s_eval(vals.a, env)
+        result = s_eval(vals[0], env)
         if result is False:
             return False
         vals = vals.b
@@ -117,7 +126,7 @@ def s_and(vals, env):
 def s_or(vals, env):
     result = False
     while isinstance(vals, Pair):
-        result = s_eval(vals.a, env)
+        result = s_eval(vals[0], env)
         if result is not False:
             return result
         vals = vals.b
@@ -133,6 +142,7 @@ def s_if(vals, env):
 
 def s_cond(vals, env):
     while isinstance(vals, Pair):
+        # 除了 False 本身, 其余都被视为 True
         if vals[0][0] == "else" or s_eval(vals[0][0], env) is not False:
             if vals[0].b is nil:
                 return s_eval(vals[0][0], env)
@@ -141,14 +151,13 @@ def s_cond(vals, env):
         vals = vals.b
 
 def s_let(vals, env):
-    if isinstance(vals[0], Pair):
+    if isinstance(vals[0], Pair): # 处理语法 (let ((var expr)) ...)
         binds, body = vals.a, vals.b
-        frame = env.create_new_frame(nil, nil)
-        while isinstance(binds, Pair):
-            frame.define(binds[0][0], s_eval(binds[0][1], env))
-            binds = binds.b
+        keys = binds.map(lambda x: x[0])
+        vals = binds.map(lambda x: s_eval(x[1], env))
+        frame = env.create_new_frame(keys, vals)
         return s_begin(body, frame)
-    else: # 处理特殊语法 (let func ((var expr)) ...)
+    else: # 处理语法 (let func ((var expr)) ...)
         binds, body = vals.b.a, vals.b.b
         formals = binds.map(lambda x: x[0])
         args = binds.map(lambda x: s_eval(x[1], env))

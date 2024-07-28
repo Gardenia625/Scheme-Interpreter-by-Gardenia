@@ -73,7 +73,7 @@ class nil:
         return 0
     def map(self, f):
         return self
-nil = nil() # 隐藏掉 nil 类型
+nil = nil() # 隐藏 nil 类
 
 class Pair:
     """Scheme 中的 Pair 类型"""
