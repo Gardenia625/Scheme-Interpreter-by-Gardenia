@@ -106,4 +106,4 @@ class Pair:
         return Pair(f(self.a), self.b.map(f))
         
 class SchemeError(Exception):
-    """预设的错误, 不终止运行"""
+    """预设的报错, 不终止运行"""

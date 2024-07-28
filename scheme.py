@@ -141,12 +141,20 @@ def s_cond(vals, env):
         vals = vals.b
 
 def s_let(vals, env):
-    binds, body = vals.a, vals.b
-    frame = env.create_new_frame(nil, nil)
-    while isinstance(binds, Pair):
-        frame.define(binds[0][0], s_eval(binds[0][1], env))
-        binds = binds.b
-    return s_begin(body, frame)
+    if isinstance(vals[0], Pair):
+        binds, body = vals.a, vals.b
+        frame = env.create_new_frame(nil, nil)
+        while isinstance(binds, Pair):
+            frame.define(binds[0][0], s_eval(binds[0][1], env))
+            binds = binds.b
+        return s_begin(body, frame)
+    else: # 处理特殊语法 (let func ((var expr)) ...)
+        binds, body = vals.b.a, vals.b.b
+        formals = binds.map(lambda x: x[0])
+        args = binds.map(lambda x: s_eval(x[1], env))
+        func = Lambda(formals, body, env)
+        env.define(vals[0], func)
+        return s_apply(func, args, env)
     
     
 special_forms = {"begin": s_begin,
@@ -176,7 +184,7 @@ C_END = "\033[0m"
 while 1:
     try:
         empty_input = 0
-        atoms = lexer(input(GREEN + "scheme>>> "  + C_END))
+        atoms = lexer(input(GREEN + "scheme>>> " + C_END))
         parentheses = atoms.count("(") - atoms.count(")")
         # 如果 "(" 多于 ")" 则等待用户继续输入
         while parentheses > 0:
